@@ -19,7 +19,8 @@ import {
 const BASE_URL_WEATHER = 'http://api.weatherapi.com/v1'
 const WEATHER_API = process.env.NEXT_PUBLIC_WEATHER_API
 const BASE_URL_CRYPTO = 'https://min-api.cryptocompare.com'
-
+const NEWS_API = process.env.NEXT_PUBLIC_NEWS_API
+const BASE_URL_NEWS = 'https://newsdata.io/api/1'
 export default function Dashboard() {
   const [currentDateTime, setCurrentDateTime] = useState('2025-04-04 17:12:05');
   // State for weather data
@@ -43,11 +44,11 @@ export default function Dashboard() {
   // State for news data
   const [newsData, setNewsData] = useState({
     headlines: [
-      { title: 'Bitcoin Hits New All-Time High as Institutional Adoption Grows', date: '2025-04-03', source: 'CryptoNews' },
-      { title: 'Extreme Weather Events Predicted to Increase in Coming Months', date: '2025-04-02', source: 'Weather Today' },
-      { title: 'Ethereum Upgrades Network to Reduce Energy Consumption by 99%', date: '2025-04-01', source: 'Blockchain Report' },
-      { title: 'Record Heatwave Expected Across European Cities Next Week', date: '2025-03-31', source: 'Global Weather' },
-      { title: 'New Crypto Regulations Set to Take Effect in Major Markets', date: '2025-03-30', source: 'Finance Daily' }
+      { title: 'Bitcoin Hits New All-Time High as Institutional Adoption Grows', date: '2025-04-03', source: 'CryptoNews', url: '' },
+      { title: 'Extreme Weather Events Predicted to Increase in Coming Months', date: '2025-04-02', source: 'Weather Today', url: '' },
+      { title: 'Ethereum Upgrades Network to Reduce Energy Consumption by 99%', date: '2025-04-01', source: 'Blockchain Report', url: '' },
+      { title: 'Record Heatwave Expected Across European Cities Next Week', date: '2025-03-31', source: 'Global Weather', url: '' },
+      { title: 'New Crypto Regulations Set to Take Effect in Major Markets', date: '2025-03-30', source: 'Finance Daily', url: '' }
     ]
   });
 
@@ -107,6 +108,27 @@ export default function Dashboard() {
     }
   };
 
+
+  const fetchNews = async () => {
+    try {
+      const response = await fetch(`${BASE_URL_NEWS}/news?apikey=${NEWS_API}&q=cryptocurrency&language=en&size=5`)
+      if (!response.ok) {
+        throw new Error(`News API error: ${response.status}`);
+      }
+      const data = await response.json();
+      const newNewsData = {
+        headlines: data.results.map(article => ({
+          title: article.title,
+          date: new Date(article.pubDate).toISOString().split('T')[0],
+          source: article.source_id,
+          url: article.link
+        }))
+      };
+      setNewsData(newNewsData);
+    } catch (error) {
+      console.error('Error fetching news data:', error);
+    }
+  };
   // Function to toggle favorite status for cities
   const toggleCityFavorite = (cityName) => {
     setWeatherData({
@@ -130,6 +152,7 @@ export default function Dashboard() {
   useEffect(() => {
     fetchWeatherData();
     fetchCryptoData();
+    fetchNews();
     const updateDateTime = () => {
       const now = new Date();
       const formattedDate = now.toISOString().split('T')[0];
@@ -140,10 +163,12 @@ export default function Dashboard() {
     const dateInterval = setInterval(updateDateTime, 60000);
     const weatherInterval = setInterval(fetchWeatherData, 3600000);
     const cryptoInterval = setInterval(fetchCryptoData, 60000);
+    const newsInterval = setInterval(fetchNews, 3600000);
     return () => {
       clearInterval(dateInterval)
       clearInterval(weatherInterval)
       clearInterval(cryptoInterval)
+      clearInterval(newsInterval)
     };
   }, []);
 
@@ -285,19 +310,22 @@ export default function Dashboard() {
 
             <div className="space-y-4">
               {newsData.headlines.map((headline, index) => (
+
                 <div key={index} className="p-4 bg-gray-700 rounded-lg">
-                  <h3 className="mb-2 font-medium text-md">{headline.title}</h3>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-400">{headline.source}</span>
-                    <span className="text-gray-400">{headline.date}</span>
-                  </div>
+                  <a href={headline.url} target='_blank' >
+                    <h3 className="mb-2 font-medium text-md">{headline.title}</h3>
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-gray-400">{headline.source}</span>
+                      <span className="text-gray-400">{headline.date}</span>
+                    </div>
+                  </a>
                 </div>
               ))}
             </div>
 
-            <button className="py-2 px-4 mt-6 w-full bg-purple-600 rounded-lg transition-colors duration-300 hover:bg-purple-700">
-              View All News
-            </button>
+            {/* <button className="py-2 px-4 mt-6 w-full bg-purple-600 rounded-lg transition-colors duration-300 hover:bg-purple-700"> */}
+            {/*   View All News */}
+            {/* </button> */}
           </div>
         </div>
       </div>
