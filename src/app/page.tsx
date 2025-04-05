@@ -18,6 +18,7 @@ import {
 
 const BASE_URL_WEATHER = 'http://api.weatherapi.com/v1'
 const WEATHER_API = process.env.NEXT_PUBLIC_WEATHER_API
+const BASE_URL_CRYPTO = 'https://min-api.cryptocompare.com'
 
 export default function Dashboard() {
   const [currentDateTime, setCurrentDateTime] = useState('2025-04-04 17:12:05');
@@ -56,7 +57,7 @@ export default function Dashboard() {
     try {
       const cities = ['New York', 'London', 'Tokyo'];
       const weatherPromises = cities.map(async (city) => {
-        const response = await fetch(`${BASE_URL_WEATHER}/current.json?key=${WEATHER_API}&q=${encodeURIComponent(city)}&aqi=no`)
+        const response = await fetch(`${BASE_URL_WEATHER}/current.json?key=${WEATHER_API}&q=${encodeURIComponent(city)}&aqi=no`);
         if (!response.ok) {
           throw new Error(`Weather API error: ${response.status}`)
         }
@@ -75,6 +76,37 @@ export default function Dashboard() {
       console.error(`Error fetching weather data: ${error}`);
     }
   };
+
+  const fetchCryptoData = async () => {
+    try {
+      const coins = ['BTC', 'ETH', 'SOL'];
+      const cryptoPromises = coins.map(async (coin) => {
+        const response = await fetch(`${BASE_URL_CRYPTO}/data/pricemultifull?fsyms=${encodeURIComponent(coin)}&tsyms=USD`);
+        if (!response.ok) {
+          throw new Error(`Crypto API Fail error: ${response.status}`);
+        }
+        const data = await response.json();
+        const coinData = data.RAW[coin].USD;
+        // console.log(`coinData: ${coinData}`)
+        return {
+          name: coin === 'BTC' ? 'Bitcoin' : coin === 'ETH' ? 'Ethereum' : 'Solana',
+          symbol: coin,
+          price: `$${coinData.PRICE.toLocaleString(undefined, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+          })}`,
+          change: `${coinData.CHANGEPCT24HOUR >= 0 ? '+' : ''}${coinData.CHANGEPCT24HOUR.toFixed(1)}%`,
+          marketCap: `$${(coinData.MKTCAP / 1e9).toFixed(1)}B`,
+          isFavorite: cryptoData.coins.find(c => c.symbol === coin)?.isFavorite || false
+        };
+      });
+      const newCryptodata = await Promise.all(cryptoPromises);
+      setCryptoData({ coins: newCryptodata });
+    } catch (error) {
+      console.error('Error fetching weather data: ', error);
+    }
+  };
+
   // Function to toggle favorite status for cities
   const toggleCityFavorite = (cityName) => {
     setWeatherData({
@@ -94,17 +126,10 @@ export default function Dashboard() {
       )
     });
   };
-
   // Effect to simulate real-time data updates
   useEffect(() => {
     fetchWeatherData();
-
-    // fetchWeatherData();
-    // const interval = setInterval(() => {
-    //   fetchWeatherData();
-    //   console.log('Fetching updated data...');
-    // }, 60000);
-
+    fetchCryptoData();
     const updateDateTime = () => {
       const now = new Date();
       const formattedDate = now.toISOString().split('T')[0];
@@ -113,10 +138,12 @@ export default function Dashboard() {
     };
     updateDateTime();
     const dateInterval = setInterval(updateDateTime, 60000);
-    const interval = setInterval(fetchWeatherData, 3600000);
+    const weatherInterval = setInterval(fetchWeatherData, 3600000);
+    const cryptoInterval = setInterval(fetchCryptoData, 60000);
     return () => {
       clearInterval(dateInterval)
-      clearInterval(interval)
+      clearInterval(weatherInterval)
+      clearInterval(cryptoInterval)
     };
   }, []);
 
@@ -193,7 +220,7 @@ export default function Dashboard() {
               ))}
             </div>
 
-            <Link href={`/weather/ ${encodeURIComponent(weatherData.cities[0].name)
+            <Link href={`/weather/${encodeURIComponent(weatherData.cities[0].name)
               }`} className="block py-2 px-4 mt-6 w-full text-center bg-blue-600 rounded-lg transition-colors duration-300 hover:bg-blue-700">
               View Detailed Weather
             </Link>
@@ -240,7 +267,7 @@ export default function Dashboard() {
               ))}
             </div>
 
-            <Link href={`/crypto/ ${encodeURIComponent(cryptoData.coins[0].symbol)
+            <Link href={`/crypto/${encodeURIComponent(cryptoData.coins[0].symbol)
               }`} className="block py-2 px-4 mt-6 w-full text-center bg-yellow-600 rounded-lg transition-colors duration-300 hover:bg-yellow-700">
               View Crypto Details
             </Link>

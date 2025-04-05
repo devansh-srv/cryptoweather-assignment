@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Bitcoin, DollarSign, TrendingUp, TrendingDown, LineChart, BarChart2, Activity } from 'lucide-react';
+import { ArrowLeft, Bitcoin, DollarSign, TrendingUp, TrendingDown, /* LineChart, */ BarChart2, Activity } from 'lucide-react';
 import Link from 'next/link';
 
 // For charting
@@ -29,10 +29,12 @@ ChartJS.register(
   Legend
 );
 
+const BASE_URL_CRYPTO = 'https://min-api.cryptocompare.com'
+const CRYPTO_API = process.env.NEXT_PUBLIC_CRYPTO_API;
 export default function CryptoDetail({ params }) {
   const router = useRouter();
-  const { symbol } = params;
-  const decodedSymbol = decodeURIComponent(symbol);
+  const { symbol } = React.use(params);
+  const decodedSymbol = decodeURIComponent(symbol).trim();
 
   // State for crypto data
   const [cryptoData, setCryptoData] = useState({
@@ -68,22 +70,116 @@ export default function CryptoDetail({ params }) {
   // Current date and time
   const [currentDateTime, setCurrentDateTime] = useState('2025-04-04 17:12:05');
 
-  useEffect(() => {
-    // This would fetch real data from a crypto API
-    console.log(`Fetching crypto data for ${decodedSymbol}...`);
+  const fetchCurrentCryptodata = async () => {
+    try {
+      const response = await fetch(`${BASE_URL_CRYPTO}/data/pricemultifull?fsyms=${encodeURIComponent(decodedSymbol)}&tsyms=USD`);
+      const supplyResponse = await fetch(`${BASE_URL_CRYPTO}/data/blockchain/histo/day?fsym=${encodeURIComponent(decodedSymbol)}&limit=1&api_key=${CRYPTO_API}`)
+      const ath = await fetchHistoricalCryptoData();
+      if (!response.ok) {
+        throw new Error(`Crypto API Fail error: ${response.status}`);
+      }
+      if (!supplyResponse.ok) {
+        throw new Error(`Crypto supply API failed: ${response.status}`);
+      }
+      const data = await response.json();
+      const coinData = data.RAW[decodedSymbol].USD;
+      const supplyData = await supplyResponse.json();
+      const currentSupply = supplyData.Data.Data[0].current_supply;
+      setCryptoData({
+        name: decodedSymbol === 'BTC' ? 'Bitcoin' : decodedSymbol === 'ETH' ? 'Ethereum' : 'Solana',
+        symbol: decodedSymbol,
+        price: `$${coinData.PRICE.toLocaleString(undefined, {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        })}`,
+        change: `${coinData.CHANGEPCT24HOUR >= 0 ? '+' : ''}${coinData.CHANGEPCT24HOUR.toFixed(2)}%`,
+        marketCap: `$${(coinData.MKTCAP / 1e9).toFixed(2)}B`,
+        volume24h: `$${coinData.VOLUME24HOUR.toLocaleString(undefined, {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        })}`,
+        circulatingSupply: `${currentSupply.toLocaleString(undefined, {
+          maximumFractionDigits: 0
+        })} ${decodedSymbol}`,
+        allTimeHigh: ath?.allTimeHigh,
+        allTimeHighDate: ath?.allTimeHighDate
 
+      });
+
+    } catch (error) {
+      console.error(`Current Crypto Fetch failed due to : ${error}`)
+    }
+  }
+
+  const fetchHistoricalCryptoData = async () => {
+    try {
+
+      const response = await fetch(`${BASE_URL_CRYPTO}/data/v2/histoday?fsym=${encodeURIComponent(decodedSymbol)}&tsym=USD&limit=30`);
+      if (!response.ok) {
+        throw new Error(`Historical API failed: ${response.status}`);
+      }
+      const historyData = await response.json();
+      const history = historyData.Data.Data;
+
+      const prices = history.map(day => day.close);
+      const volumes = history.map(day => day.volumeto / 1e9);
+      const labels = history.map((_, i) => `${i}d ago`).reverse();
+      labels[labels.length - 1] = 'Today';
+
+      const maxPrice = Math.max(...prices);
+      const maxIndex = prices.indexOf(maxPrice);
+      const maxDate = labels[maxIndex];
+
+      setHistoricalData({
+        labels,
+        prices,
+        volumes,
+      });
+      return {
+        allTimeHigh: `$${maxPrice.toLocaleString(undefined, {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })}`,
+        allTimeHighDate: maxDate
+      };
+    } catch (error) {
+      console.error(`Error fetching historical crypto data: ${error}`);
+    }
+  };
+  useEffect(() => {
+    const fetchAllCryptoData = () => {
+      fetchCurrentCryptodata();
+      fetchHistoricalCryptoData();
+      console.log('Crypto data updated at:', new Date().toLocaleString());
+    }
+    fetchAllCryptoData();
+
+    // fetchCurrentCryptodata();
+
+    console.log('Crypto data updated at:', new Date().toLocaleString());
+
+    const currentCryptoInterval = setInterval(() => {
+      fetchCurrentCryptodata();
+    }, 3600000)
+    const historicalCryptoDataInterval = setInterval(() => {
+      fetchHistoricalCryptoData();
+    }, 3600000)
     // Update current date/time
     const updateDateTime = () => {
       const now = new Date();
       const formattedDate = now.toISOString().split('T')[0];
       const formattedTime = now.toTimeString().split(' ')[0];
-      setCurrentDateTime(`${formattedDate} ${formattedTime}`);
+      setCurrentDateTime(`${formattedDate} ${formattedTime} `);
     };
 
     updateDateTime();
-    const interval = setInterval(updateDateTime, 60000);
+    const interval = setInterval(updateDateTime, 3600000);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      clearInterval(currentCryptoInterval);
+      clearInterval(historicalCryptoDataInterval)
+    };
   }, [decodedSymbol]);
 
   // Helper function to render crypto icon based on symbol
@@ -186,8 +282,8 @@ export default function CryptoDetail({ params }) {
               {renderCryptoIcon()}
               <div className="ml-4">
                 <div className="text-4xl font-bold">{cryptoData.price}</div>
-                <div className={`flex items-center ${cryptoData.change.startsWith('+') ? 'text-green-500' : 'text-red-500'
-                  }`}>
+                <div className={`flex items - center ${cryptoData.change.startsWith('+') ? 'text-green-500' : 'text-red-500'
+                  } `}>
                   {cryptoData.change.startsWith('+')
                     ? <TrendingUp size={16} className="mr-1" />
                     : <TrendingDown size={16} className="mr-1" />
@@ -278,7 +374,7 @@ export default function CryptoDetail({ params }) {
                       <td className="py-3 px-4">{date}</td>
                       <td className="py-3 px-4">${historicalData.prices[index].toLocaleString()}</td>
                       <td className="py-3 px-4">${historicalData.volumes[index]}B</td>
-                      <td className={`py-3 px-4 ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
+                      <td className={`py - 3 px - 4 ${isPositive ? 'text-green-500' : 'text-red-500'} `}>
                         {isPositive ? '+' : ''}{priceChange}%
                       </td>
                     </tr>

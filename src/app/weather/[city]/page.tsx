@@ -72,7 +72,7 @@ export default function CityWeatherDetail({ params }) {
         feelsLike: `${data.current.feelslike_c}°C`,
         pressure: `${data.current.pressure_mb} hPa`,
       });
-    } catch (error) { console.error(`Fetch failed due to : ${error}`) }
+    } catch (error) { console.error(`Current Weather Fetch failed due to : ${error}`) }
   }
 
   const fetchHistoricalWeatherData = async () => {
