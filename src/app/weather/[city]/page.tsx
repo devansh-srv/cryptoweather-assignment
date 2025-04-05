@@ -29,6 +29,8 @@ ChartJS.register(
   Legend
 );
 
+const BASE_URL_WEATHER = 'http://api.weatherapi.com/v1';
+const WEATHER_API = process.env.NEXT_PUBLIC_WEATHER_API;
 export default function CityWeatherDetail({ params }) {
   const router = useRouter();
   const { city } = React.use(params);
@@ -54,22 +56,84 @@ export default function CityWeatherDetail({ params }) {
   // Current date and time
   const [currentDateTime, setCurrentDateTime] = useState('2025-04-04 17:12:05');
 
-  useEffect(() => {
-    // This would fetch real data from a weather API
-    console.log(`Fetching weather data for ${decodedCity}...`);
+  const fetchCurrentWeather = async () => {
+    try {
+      const response = await fetch(`${BASE_URL_WEATHER}/current.json?key=${WEATHER_API}&q=${encodeURIComponent(decodedCity)}&aqi=no`);
 
-    // Update current date/time
+      if (!response.ok) {
+        throw new Error(`Weather API error: ${response.status}`);
+      }
+      const data = await response.json();
+      setCurrentWeather({
+        temp: `${data.current.temp_c}°C`,
+        humidity: `${data.current.humidity}%`,
+        condition: data.current.condition.text,
+        wind: `${data.current.wind_kph} km/h`,
+        feelsLike: `${data.current.feelslike_c}°C`,
+        pressure: `${data.current.pressure_mb} hPa`,
+      });
+    } catch (error) { console.error(`Fetch failed due to : ${error}`) }
+  }
+
+  const fetchHistoricalWeatherData = async () => {
+    try {
+      const dates = [];
+      const temperatures = [];
+      const humidities = [];
+      const today = new Date();
+      for (let i = 7; i >= 0; i--) {
+        const date = new Date(today);
+        date.setDate(date.getDate() - i);
+        const dateStr = date.toISOString().split('T')[0];
+        const response = await fetch(`${BASE_URL_WEATHER}/history.json?key=${WEATHER_API}&q=${encodeURIComponent(decodedCity)}&dt=${dateStr}`);
+        if (!response.ok) {
+          throw new Error(`Weather API error: ${response.status}`);
+        }
+        const data = await response.json();
+        const dayData = data?.forecast?.forecastday[0];
+        dates.push(i === 0 ? 'Today' : i === 1 ? 'Yesterday' : `${i} days ago`);
+        temperatures.push(dayData.day.avgtemp_c);
+        humidities.push(dayData.day.avghumidity);
+      }
+      setHistoricalData({
+        labels: dates,
+        temperatures: temperatures,
+        humidity: humidities,
+      });
+    }
+    catch (error) {
+      console.error(`Error fetching historical data: ${error}`);
+    }
+  };
+  useEffect(() => {
+    const fetchAllWeatherData = () => {
+      fetchCurrentWeather();
+      fetchHistoricalWeatherData();
+      console.log('Weather data updated at:', new Date().toLocaleString());
+    }
+    fetchAllWeatherData();
+    const currentWeatherInterval = setInterval(() => {
+      fetchCurrentWeather();
+    }, 3600000)
+
+    const historicalWeatherDataInterval = setInterval(() => {
+      fetchHistoricalWeatherData();
+    }, 3600000)
     const updateDateTime = () => {
       const now = new Date();
       const formattedDate = now.toISOString().split('T')[0];
       const formattedTime = now.toTimeString().split(' ')[0];
-      setCurrentDateTime(`${formattedDate} ${formattedTime}`);
+      setCurrentDateTime(`${formattedDate} ${formattedTime} `);
     };
 
     updateDateTime();
     const interval = setInterval(updateDateTime, 60000);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(currentWeatherInterval);
+      clearInterval(historicalWeatherDataInterval);
+      clearInterval(interval)
+    };
   }, [decodedCity]);
 
   // Helper function to render weather icon based on condition
@@ -91,7 +155,7 @@ export default function CityWeatherDetail({ params }) {
     labels: historicalData.labels,
     datasets: [
       {
-        label: 'Temperature (°C)',
+        label: 'Average Temperature (°C)',
         data: historicalData.temperatures,
         borderColor: 'rgb(255, 99, 132)',
         backgroundColor: 'rgba(255, 99, 132, 0.5)',

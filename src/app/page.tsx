@@ -16,7 +16,11 @@ import {
   StarOff
 } from 'lucide-react';
 
+const BASE_URL_WEATHER = 'http://api.weatherapi.com/v1'
+const WEATHER_API = process.env.NEXT_PUBLIC_WEATHER_API
+
 export default function Dashboard() {
+  const [currentDateTime, setCurrentDateTime] = useState('2025-04-04 17:12:05');
   // State for weather data
   const [weatherData, setWeatherData] = useState({
     cities: [
@@ -46,6 +50,31 @@ export default function Dashboard() {
     ]
   });
 
+  //function to fetch weatherData from weather api
+
+  const fetchWeatherData = async () => {
+    try {
+      const cities = ['New York', 'London', 'Tokyo'];
+      const weatherPromises = cities.map(async (city) => {
+        const response = await fetch(`${BASE_URL_WEATHER}/current.json?key=${WEATHER_API}&q=${encodeURIComponent(city)}&aqi=no`)
+        if (!response.ok) {
+          throw new Error(`Weather API error: ${response.status}`)
+        }
+        const data = await response.json();
+        return {
+          name: city,
+          temp: `${data.current.temp_c}°C`,
+          humidity: `${data.current.humidity}%`,
+          condition: data.current.condition.text,
+          isFavorite: weatherData.cities.find(c => c.name === city)?.isFavorite || false
+        };
+      });
+      const newWeatherData = await Promise.all(weatherPromises);
+      setWeatherData({ cities: newWeatherData });
+    } catch (error) {
+      console.error(`Error fetching weather data: ${error}`);
+    }
+  };
   // Function to toggle favorite status for cities
   const toggleCityFavorite = (cityName) => {
     setWeatherData({
@@ -68,25 +97,40 @@ export default function Dashboard() {
 
   // Effect to simulate real-time data updates
   useEffect(() => {
-    const interval = setInterval(() => {
-      // In a real app, you would fetch data from APIs here
-      console.log('Fetching updated data...');
-    }, 60000); // Update every minute
+    fetchWeatherData();
 
-    return () => clearInterval(interval);
+    // fetchWeatherData();
+    // const interval = setInterval(() => {
+    //   fetchWeatherData();
+    //   console.log('Fetching updated data...');
+    // }, 60000);
+
+    const updateDateTime = () => {
+      const now = new Date();
+      const formattedDate = now.toISOString().split('T')[0];
+      const formattedTime = now.toTimeString().split(' ')[0];
+      setCurrentDateTime(`${formattedDate} ${formattedTime} `);
+    };
+    updateDateTime();
+    const dateInterval = setInterval(updateDateTime, 60000);
+    const interval = setInterval(fetchWeatherData, 3600000);
+    return () => {
+      clearInterval(dateInterval)
+      clearInterval(interval)
+    };
   }, []);
 
   // Helper function to render weather icon based on condition
   const renderWeatherIcon = (condition) => {
-    switch (condition.toLowerCase()) {
-      case 'sunny':
-        return <Sun className="text-yellow-400" />;
-      case 'cloudy':
-        return <Cloud className="text-gray-400" />;
-      case 'rainy':
-        return <CloudRain className="text-blue-400" />;
-      default:
-        return <Cloud className="text-gray-400" />;
+    const condtionLower = condition.toLowerCase();
+    if (condtionLower.includes('sun') || condtionLower.includes('clear')) {
+      return <Sun className='text-yellow-400' />;
+    } else if (condtionLower.includes('rain') || condtionLower.includes('drizzle')) {
+      return <CloudRain className='text-blue-400' />;
+    } else if (condtionLower.includes('cloud') || condtionLower.includes('overcast')) {
+      return <Cloud className='text-gray-400' />;
+    } else {
+      return <Cloud className='text-gray-400' />;
     }
   };
 
@@ -114,7 +158,7 @@ export default function Dashboard() {
                 <Cloud className="text-blue-400" />
                 Weather
               </h2>
-              <span className="text-xs text-gray-400">Last updated: 2025-04-04 17:00</span>
+              <span className="text-xs text-gray-400">Last updated: {currentDateTime}</span>
             </div>
 
             <div className="space-y-6">
@@ -149,7 +193,8 @@ export default function Dashboard() {
               ))}
             </div>
 
-            <Link href={`/weather/${encodeURIComponent(weatherData.cities[0].name)}`} className="block py-2 px-4 mt-6 w-full text-center bg-blue-600 rounded-lg transition-colors duration-300 hover:bg-blue-700">
+            <Link href={`/weather/ ${encodeURIComponent(weatherData.cities[0].name)
+              }`} className="block py-2 px-4 mt-6 w-full text-center bg-blue-600 rounded-lg transition-colors duration-300 hover:bg-blue-700">
               View Detailed Weather
             </Link>
           </div>
@@ -185,7 +230,7 @@ export default function Dashboard() {
                     <div className="text-sm text-gray-300">
                       Market Cap: {coin.marketCap}
                     </div>
-                    <div className={`flex items-center gap-1 ${coin.change.startsWith('+') ? 'text-green-500' : 'text-red-500'
+                    <div className={`flex items - center gap - 1 ${coin.change.startsWith('+') ? 'text-green-500' : 'text-red-500'
                       }`}>
                       {renderChangeIcon(coin.change)}
                       {coin.change}
@@ -195,7 +240,8 @@ export default function Dashboard() {
               ))}
             </div>
 
-            <Link href={`/crypto/${encodeURIComponent(cryptoData.coins[0].symbol)}`} className="block py-2 px-4 mt-6 w-full text-center bg-yellow-600 rounded-lg transition-colors duration-300 hover:bg-yellow-700">
+            <Link href={`/crypto/ ${encodeURIComponent(cryptoData.coins[0].symbol)
+              }`} className="block py-2 px-4 mt-6 w-full text-center bg-yellow-600 rounded-lg transition-colors duration-300 hover:bg-yellow-700">
               View Crypto Details
             </Link>
           </div>
