@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import {
   Cloud,
@@ -26,7 +26,7 @@ const NotificationToast = dynamic(() => import('./components/NotificationToast')
 const BASE_URL_WEATHER = 'https://api.weatherapi.com/v1'
 const WEATHER_API = process.env.NEXT_PUBLIC_WEATHER_API
 const BASE_URL_CRYPTO = 'https://min-api.cryptocompare.com'
-// const CRYPTO_API = process.env.NEXT_PUBLIC_CRYPTO_API;
+const CRYPTO_API = process.env.NEXT_PUBLIC_CRYPTO_API;
 const NEWS_API = process.env.NEXT_PUBLIC_NEWS_API
 const BASE_URL_NEWS = 'https://newsdata.io/api/1'
 
@@ -178,7 +178,7 @@ export default function DashboardClient() {
   }, []);
 
   // Helper function to render weather icon based on condition
-  const renderWeatherIcon = (condition) => {
+  const renderWeatherIcon = (condition: string) => {
     const condtionLower = condition.toLowerCase();
     if (condtionLower.includes('sun') || condtionLower.includes('clear')) {
       return <Sun className='text-yellow-400' />;
