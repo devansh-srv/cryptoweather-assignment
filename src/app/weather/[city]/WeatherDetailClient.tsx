@@ -199,8 +199,14 @@ export default function WeatherDetailClient({ params, initialData }: WeatherDeta
         backgroundColor: 'rgba(255, 99, 132, 0.5)',
         tension: 0.3,
       },
+    ],
+  };
+  const humidityChartData = {
+
+    labels: historicalData.labels,
+    datasets: [
       {
-        label: 'Humidity (%)',
+        label: 'Average Humidity (%)',
         data: historicalData.humidity,
         borderColor: 'rgb(53, 162, 235)',
         backgroundColor: 'rgba(53, 162, 235, 0.5)',
@@ -308,9 +314,13 @@ export default function WeatherDetailClient({ params, initialData }: WeatherDeta
             {/* Historical Weather Chart */}
             <div className="p-6 mb-8 bg-gray-800 rounded-xl border border-gray-700 shadow-lg">
               <h2 className="mb-6 text-xl font-semibold">Historical Weather Data</h2>
-
-              <div className="h-80">
-                <Line options={chartOptions} data={temperatureChartData} />
+              <div className='grid grid-cols-1 gap-8 md:grid-cols-2'>
+                <div className="h-80">
+                  <Line options={chartOptions} data={temperatureChartData} />
+                </div>
+                <div className="h-80">
+                  <Line options={chartOptions} data={humidityChartData} />
+                </div>
               </div>
             </div>
 
