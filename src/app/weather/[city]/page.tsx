@@ -4,6 +4,9 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Cloud, CloudRain, Sun, Droplets, Wind, Thermometer } from 'lucide-react';
 import Link from 'next/link';
+import { useDispatch } from 'react-redux';
+import { addNotification } from '../../store/notificationSlice';
+import { v4 as uuidv4 } from 'uuid';
 
 // For charting
 import { Line } from 'react-chartjs-2';
@@ -105,7 +108,23 @@ export default function CityWeatherDetail({ params }) {
       console.error(`Error fetching historical data: ${error}`);
     }
   };
+  const dispatch = useDispatch()
   useEffect(() => {
+    const weatherAlertInterval = setInterval(() => {
+      const alerts = [
+        'Storm Warning in ' + decodedCity,
+        'Heavy Rain Expected in ' + decodedCity,
+        'Extreme Heat Alert in ' + decodedCity,
+      ];
+      const randomAlert = alerts[Math.floor(Math.random() * alerts.length)];
+      dispatch(addNotification({
+        id: uuidv4(),
+        type: 'weather_alert',
+        message: randomAlert,
+        timestamp: Date.now(),
+      }));
+    }, 300000);
+
     const fetchAllWeatherData = () => {
       fetchCurrentWeather();
       fetchHistoricalWeatherData();
@@ -133,8 +152,9 @@ export default function CityWeatherDetail({ params }) {
       clearInterval(currentWeatherInterval);
       clearInterval(historicalWeatherDataInterval);
       clearInterval(interval)
+      clearInterval(weatherAlertInterval)
     };
-  }, [decodedCity]);
+  }, [decodedCity, dispatch]);
 
   // Helper function to render weather icon based on condition
   const renderWeatherIcon = (condition) => {

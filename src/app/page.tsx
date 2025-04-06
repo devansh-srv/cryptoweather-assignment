@@ -19,6 +19,7 @@ import {
 const BASE_URL_WEATHER = 'http://api.weatherapi.com/v1'
 const WEATHER_API = process.env.NEXT_PUBLIC_WEATHER_API
 const BASE_URL_CRYPTO = 'https://min-api.cryptocompare.com'
+// const CRYPTO_API = process.env.NEXT_PUBLIC_CRYPTO_API;
 const NEWS_API = process.env.NEXT_PUBLIC_NEWS_API
 const BASE_URL_NEWS = 'https://newsdata.io/api/1'
 export default function Dashboard() {

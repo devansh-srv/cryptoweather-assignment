@@ -1,5 +1,8 @@
 'use client';
-
+import { useDispatch } from 'react-redux';
+import { updateCryptoPrice } from '../../store/cryptoSlice';
+import { addNotification } from '../../store/notificationSlice';
+import { v4 as uuidv4 } from 'uuid';
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Bitcoin, DollarSign, TrendingUp, TrendingDown, /* LineChart, */ BarChart2, Activity } from 'lucide-react';
@@ -44,7 +47,7 @@ export default function CryptoDetail({ params }) {
     change: decodedSymbol === 'BTC' ? '+2.5%' : decodedSymbol === 'ETH' ? '-1.2%' : '+5.7%',
     marketCap: decodedSymbol === 'BTC' ? '$1.32T' : decodedSymbol === 'ETH' ? '$416.8B' : '$61.3B',
     volume24h: decodedSymbol === 'BTC' ? '$42.3B' : decodedSymbol === 'ETH' ? '$18.5B' : '$3.8B',
-    circulatingSupply: decodedSymbol === 'BTC' ? '19.35M BTC' : decodedSymbol === 'ETH' ? '120.21M ETH' : '431.15M SOL',
+    // circulatingSupply: decodedSymbol === 'BTC' ? '19.35M BTC' : decodedSymbol === 'ETH' ? '120.21M ETH' : '431.15M SOL',
     allTimeHigh: decodedSymbol === 'BTC' ? '$69,045.00' : decodedSymbol === 'ETH' ? '$4,891.70' : '$260.06',
     allTimeHighDate: decodedSymbol === 'BTC' ? '2025-03-15' : decodedSymbol === 'ETH' ? '2024-12-01' : '2024-11-08',
   });
@@ -72,19 +75,22 @@ export default function CryptoDetail({ params }) {
 
   const fetchCurrentCryptodata = async () => {
     try {
+      // console.log(`${BASE_URL_CRYPTO}/data/blockchain/histo/day?fsym=${encodeURIComponent(decodedSymbol)}&api_key=${CRYPTO_API}`)
       const response = await fetch(`${BASE_URL_CRYPTO}/data/pricemultifull?fsyms=${encodeURIComponent(decodedSymbol)}&tsyms=USD`);
-      const supplyResponse = await fetch(`${BASE_URL_CRYPTO}/data/blockchain/histo/day?fsym=${encodeURIComponent(decodedSymbol)}&limit=1&api_key=${CRYPTO_API}`)
+      // const supplyResponse = await fetch(`${BASE_URL_CRYPTO}/data/blockchain/histo/day?fsym=${encodeURIComponent(decodedSymbol)}&limit=1&api_key=${CRYPTO_API}`)
       const ath = await fetchHistoricalCryptoData();
       if (!response.ok) {
         throw new Error(`Crypto API Fail error: ${response.status}`);
       }
-      if (!supplyResponse.ok) {
-        throw new Error(`Crypto supply API failed: ${response.status}`);
-      }
+      // if (!supplyResponse.ok) {
+      //   throw new Error(`Crypto supply API failed: ${response.status}`);
+      // }
       const data = await response.json();
       const coinData = data.RAW[decodedSymbol].USD;
-      const supplyData = await supplyResponse.json();
-      const currentSupply = supplyData.Data.Data[0].current_supply;
+      // const supplyData = await supplyResponse.json();
+      // console.log('supply: ', supplyData)
+      // const currentSupply = supplyData.Data.Data[0].current_supply;
+      // console.log(currentSupply)
       setCryptoData({
         name: decodedSymbol === 'BTC' ? 'Bitcoin' : decodedSymbol === 'ETH' ? 'Ethereum' : 'Solana',
         symbol: decodedSymbol,
@@ -98,10 +104,11 @@ export default function CryptoDetail({ params }) {
           minimumFractionDigits: 2,
           maximumFractionDigits: 2
         })}`,
-        circulatingSupply: `${currentSupply.toLocaleString(undefined, {
-          maximumFractionDigits: 0
-        })} ${decodedSymbol}`,
-        allTimeHigh: ath?.allTimeHigh,
+        // circulatingSupply: '',
+        // `${currentSupply.toLocaleString(undefined, {
+        //   maximumFractionDigits: 0
+        // })} ${decodedSymbol}`,
+        allTimeHigh: ath.allTimeHigh,
         allTimeHighDate: ath?.allTimeHighDate
 
       });
@@ -146,7 +153,34 @@ export default function CryptoDetail({ params }) {
       console.error(`Error fetching historical crypto data: ${error}`);
     }
   };
+  const dispatch = useDispatch();
   useEffect(() => {
+    const socket = new WebSocket(`wss://streamer.cryptocompare.com/v2?api_key=${CRYPTO_API}`);
+    socket.onopen = () => {
+      socket.send(JSON.stringify({
+        action: "SubAdd",
+        subs: [`5~CCCAGG~${decodedSymbol}~USD`],
+      }));
+    };
+    socket.onmessage = (message) => {
+      const data = JSON.parse(message.data);
+      if (data.TYPE === '5') {
+        dispatch(updateCryptoPrice({
+          symbol: decodedSymbol,
+          price: data.PRICE,
+          changePct: data.CHANGEPCT24HOUR,
+          volume24h: data.VOLUME24HOUR,
+        }));
+        if (Math.abs(data.CHANGEPCT24HOUR) > 2) {
+          dispatch(addNotification({
+            id: uuidv4(),
+            type: 'price_alert',
+            message: `${decodedSymbol} price ${data.CHANGEPCT24HOUR >= 0 ? 'up' : 'down'} by ${data.CHANGEPCT24HOUR.toFixed(2)}%`,
+            timestamp: Date.now(),
+          }));
+        }
+      }
+    }
     const fetchAllCryptoData = () => {
       fetchCurrentCryptodata();
       fetchHistoricalCryptoData();
@@ -179,8 +213,9 @@ export default function CryptoDetail({ params }) {
       clearInterval(interval);
       clearInterval(currentCryptoInterval);
       clearInterval(historicalCryptoDataInterval)
+      socket.close();
     };
-  }, [decodedSymbol]);
+  }, [decodedSymbol, dispatch]);
 
   // Helper function to render crypto icon based on symbol
   const renderCryptoIcon = () => {
@@ -293,7 +328,7 @@ export default function CryptoDetail({ params }) {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div className="p-3 bg-gray-700 rounded-lg">
                 <div className="flex items-center mb-1 text-gray-400">
                   <DollarSign size={16} className="mr-2 text-green-400" />
@@ -310,13 +345,6 @@ export default function CryptoDetail({ params }) {
                 <div className="text-xl">{cryptoData.volume24h}</div>
               </div>
 
-              <div className="p-3 bg-gray-700 rounded-lg">
-                <div className="flex items-center mb-1 text-gray-400">
-                  <Activity size={16} className="mr-2 text-purple-400" />
-                  Circulating Supply
-                </div>
-                <div className="text-xl">{cryptoData.circulatingSupply}</div>
-              </div>
 
               <div className="p-3 bg-gray-700 rounded-lg">
                 <div className="flex items-center mb-1 text-gray-400">
