@@ -36,7 +36,7 @@ interface WeatherDetailClientProps {
   params: { city: string };
   initialData: any;
 }
-const BASE_URL_WEATHER = 'http://api.weatherapi.com/v1';
+const BASE_URL_WEATHER = 'https://api.weatherapi.com/v1';
 const WEATHER_API = process.env.NEXT_PUBLIC_WEATHER_API;
 export default function WeatherDetailClient({ params, initialData }: WeatherDetailClientProps) {
   const dispatch = useDispatch()

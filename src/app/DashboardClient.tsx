@@ -23,7 +23,7 @@ import { RootState } from './store/store';
 import dynamic from 'next/dynamic'
 const NotificationToast = dynamic(() => import('./components/NotificationToast'));
 
-const BASE_URL_WEATHER = 'http://api.weatherapi.com/v1'
+const BASE_URL_WEATHER = 'https://api.weatherapi.com/v1'
 const WEATHER_API = process.env.NEXT_PUBLIC_WEATHER_API
 const BASE_URL_CRYPTO = 'https://min-api.cryptocompare.com'
 // const CRYPTO_API = process.env.NEXT_PUBLIC_CRYPTO_API;
