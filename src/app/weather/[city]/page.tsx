@@ -35,10 +35,12 @@ ChartJS.register(
 const BASE_URL_WEATHER = 'http://api.weatherapi.com/v1';
 const WEATHER_API = process.env.NEXT_PUBLIC_WEATHER_API;
 export default function CityWeatherDetail({ params }) {
+  const dispatch = useDispatch()
   const router = useRouter();
   const { city } = React.use(params);
   const decodedCity = decodeURIComponent(city);
-
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   // State for weather data
   const [currentWeather, setCurrentWeather] = useState({
     temp: '22°C',
@@ -60,6 +62,7 @@ export default function CityWeatherDetail({ params }) {
   const [currentDateTime, setCurrentDateTime] = useState('2025-04-04 17:12:05');
 
   const fetchCurrentWeather = async () => {
+    setLoading(true);
     try {
       const response = await fetch(`${BASE_URL_WEATHER}/current.json?key=${WEATHER_API}&q=${encodeURIComponent(decodedCity)}&aqi=no`);
 
@@ -75,7 +78,19 @@ export default function CityWeatherDetail({ params }) {
         feelsLike: `${data.current.feelslike_c}°C`,
         pressure: `${data.current.pressure_mb} hPa`,
       });
-    } catch (error) { console.error(`Current Weather Fetch failed due to : ${error}`) }
+      setError(null)
+    } catch (error: any) {
+      console.error(`Current Weather Fetch failed due to : ${error}`)
+      setError(error.message);
+      dispatch(addNotification({
+        id: uuidv4(),
+        type: 'weather_alert',
+        message: `Error fetching weather data for ${decodedCity}: ${error.message}`,
+        timestamp: Date.now(),
+      }));
+    } finally {
+      setLoading(false)
+    }
   }
 
   const fetchHistoricalWeatherData = async () => {
@@ -108,7 +123,6 @@ export default function CityWeatherDetail({ params }) {
       console.error(`Error fetching historical data: ${error}`);
     }
   };
-  const dispatch = useDispatch()
   useEffect(() => {
     const weatherAlertInterval = setInterval(() => {
       const alerts = [
@@ -123,7 +137,7 @@ export default function CityWeatherDetail({ params }) {
         message: randomAlert,
         timestamp: Date.now(),
       }));
-    }, 300000);
+    }, 60000);
 
     const fetchAllWeatherData = () => {
       fetchCurrentWeather();
@@ -133,7 +147,7 @@ export default function CityWeatherDetail({ params }) {
     fetchAllWeatherData();
     const currentWeatherInterval = setInterval(() => {
       fetchCurrentWeather();
-    }, 3600000)
+    }, 60000)
 
     const historicalWeatherDataInterval = setInterval(() => {
       fetchHistoricalWeatherData();
@@ -222,111 +236,117 @@ export default function CityWeatherDetail({ params }) {
   return (
     <main className="min-h-screen text-white bg-gradient-to-br from-gray-900 to-gray-800">
       <div className="container py-8 px-4 mx-auto">
-        <Link href="/" className="inline-flex items-center mb-6 text-blue-400 hover:text-blue-300">
-          <ArrowLeft size={16} className="mr-2" />
-          Back to Dashboard
-        </Link>
+        {loading && <p className="text-center">Loading weather data...</p>}
+        {error && <p className="text-center text-red-500">{error}</p>}
+        {
+          <>
+            <Link href="/" className="inline-flex items-center mb-6 text-blue-400 hover:text-blue-300">
+              <ArrowLeft size={16} className="mr-2" />
+              Back to Dashboard
+            </Link>
 
-        <div className="flex flex-col justify-between items-start mb-8 md:flex-row">
-          <div>
-            <h1 className="mb-2 text-3xl font-bold">
-              {decodedCity} Weather
-            </h1>
-            <p className="text-gray-400">Last updated: {currentDateTime}</p>
-          </div>
-        </div>
-
-        {/* Current Weather Card */}
-        <div className="p-6 mb-8 bg-gray-800 rounded-xl border border-gray-700 shadow-lg">
-          <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
-            <div className="flex items-center">
-              {renderWeatherIcon(currentWeather.condition)}
-              <div className="ml-4">
-                <div className="text-4xl font-bold">{currentWeather.temp}</div>
-                <div className="text-gray-400">{currentWeather.condition}</div>
+            <div className="flex flex-col justify-between items-start mb-8 md:flex-row">
+              <div>
+                <h1 className="mb-2 text-3xl font-bold">
+                  {decodedCity} Weather
+                </h1>
+                <p className="text-gray-400">Last updated: {currentDateTime}</p>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="p-3 bg-gray-700 rounded-lg">
-                <div className="flex items-center mb-1 text-gray-400">
-                  <Droplets size={16} className="mr-2 text-blue-400" />
-                  Humidity
+            {/* Current Weather Card */}
+            <div className="p-6 mb-8 bg-gray-800 rounded-xl border border-gray-700 shadow-lg">
+              <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+                <div className="flex items-center">
+                  {renderWeatherIcon(currentWeather.condition)}
+                  <div className="ml-4">
+                    <div className="text-4xl font-bold">{currentWeather.temp}</div>
+                    <div className="text-gray-400">{currentWeather.condition}</div>
+                  </div>
                 </div>
-                <div className="text-xl">{currentWeather.humidity}</div>
-              </div>
 
-              <div className="p-3 bg-gray-700 rounded-lg">
-                <div className="flex items-center mb-1 text-gray-400">
-                  <Wind size={16} className="mr-2 text-blue-300" />
-                  Wind
-                </div>
-                <div className="text-xl">{currentWeather.wind}</div>
-              </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-3 bg-gray-700 rounded-lg">
+                    <div className="flex items-center mb-1 text-gray-400">
+                      <Droplets size={16} className="mr-2 text-blue-400" />
+                      Humidity
+                    </div>
+                    <div className="text-xl">{currentWeather.humidity}</div>
+                  </div>
 
-              <div className="p-3 bg-gray-700 rounded-lg">
-                <div className="flex items-center mb-1 text-gray-400">
-                  <Thermometer size={16} className="mr-2 text-red-400" />
-                  Feels Like
-                </div>
-                <div className="text-xl">{currentWeather.feelsLike}</div>
-              </div>
+                  <div className="p-3 bg-gray-700 rounded-lg">
+                    <div className="flex items-center mb-1 text-gray-400">
+                      <Wind size={16} className="mr-2 text-blue-300" />
+                      Wind
+                    </div>
+                    <div className="text-xl">{currentWeather.wind}</div>
+                  </div>
 
-              <div className="p-3 bg-gray-700 rounded-lg">
-                <div className="flex items-center mb-1 text-gray-400">
-                  <Cloud size={16} className="mr-2 text-gray-400" />
-                  Pressure
+                  <div className="p-3 bg-gray-700 rounded-lg">
+                    <div className="flex items-center mb-1 text-gray-400">
+                      <Thermometer size={16} className="mr-2 text-red-400" />
+                      Feels Like
+                    </div>
+                    <div className="text-xl">{currentWeather.feelsLike}</div>
+                  </div>
+
+                  <div className="p-3 bg-gray-700 rounded-lg">
+                    <div className="flex items-center mb-1 text-gray-400">
+                      <Cloud size={16} className="mr-2 text-gray-400" />
+                      Pressure
+                    </div>
+                    <div className="text-xl">{currentWeather.pressure}</div>
+                  </div>
                 </div>
-                <div className="text-xl">{currentWeather.pressure}</div>
               </div>
             </div>
-          </div>
-        </div>
 
-        {/* Historical Weather Chart */}
-        <div className="p-6 mb-8 bg-gray-800 rounded-xl border border-gray-700 shadow-lg">
-          <h2 className="mb-6 text-xl font-semibold">Historical Weather Data</h2>
+            {/* Historical Weather Chart */}
+            <div className="p-6 mb-8 bg-gray-800 rounded-xl border border-gray-700 shadow-lg">
+              <h2 className="mb-6 text-xl font-semibold">Historical Weather Data</h2>
 
-          <div className="h-80">
-            <Line options={chartOptions} data={temperatureChartData} />
-          </div>
-        </div>
+              <div className="h-80">
+                <Line options={chartOptions} data={temperatureChartData} />
+              </div>
+            </div>
 
-        {/* Historical Weather Table */}
-        <div className="p-6 bg-gray-800 rounded-xl border border-gray-700 shadow-lg">
-          <h2 className="mb-6 text-xl font-semibold">7-Day Weather History</h2>
+            {/* Historical Weather Table */}
+            <div className="p-6 bg-gray-800 rounded-xl border border-gray-700 shadow-lg">
+              <h2 className="mb-6 text-xl font-semibold">7-Day Weather History</h2>
 
-          <div className="overflow-x-auto">
-            <table className="overflow-hidden min-w-full bg-gray-700 rounded-lg">
-              <thead>
-                <tr className="bg-gray-600">
-                  <th className="py-3 px-4 text-left">Day</th>
-                  <th className="py-3 px-4 text-left">Temperature</th>
-                  <th className="py-3 px-4 text-left">Humidity</th>
-                  <th className="py-3 px-4 text-left">Condition</th>
-                </tr>
-              </thead>
-              <tbody>
-                {historicalData.labels.map((day, index) => (
-                  <tr key={index} className="border-t border-gray-600">
-                    <td className="py-3 px-4">{day}</td>
-                    <td className="py-3 px-4">{historicalData.temperatures[index]}°C</td>
-                    <td className="py-3 px-4">{historicalData.humidity[index]}%</td>
-                    <td className="py-3 px-4">
-                      {index === 7 ? 'Sunny' :
-                        index === 6 ? 'Cloudy' :
-                          index === 5 ? 'Sunny' :
-                            index === 4 ? 'Sunny' :
-                              index === 3 ? 'Rainy' :
-                                index === 2 ? 'Cloudy' :
-                                  index === 1 ? 'Sunny' : 'Cloudy'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+              <div className="overflow-x-auto">
+                <table className="overflow-hidden min-w-full bg-gray-700 rounded-lg">
+                  <thead>
+                    <tr className="bg-gray-600">
+                      <th className="py-3 px-4 text-left">Day</th>
+                      <th className="py-3 px-4 text-left">Temperature</th>
+                      <th className="py-3 px-4 text-left">Humidity</th>
+                      <th className="py-3 px-4 text-left">Condition</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {historicalData.labels.map((day, index) => (
+                      <tr key={index} className="border-t border-gray-600">
+                        <td className="py-3 px-4">{day}</td>
+                        <td className="py-3 px-4">{historicalData.temperatures[index]}°C</td>
+                        <td className="py-3 px-4">{historicalData.humidity[index]}%</td>
+                        <td className="py-3 px-4">
+                          {index === 7 ? 'Sunny' :
+                            index === 6 ? 'Cloudy' :
+                              index === 5 ? 'Sunny' :
+                                index === 4 ? 'Sunny' :
+                                  index === 3 ? 'Rainy' :
+                                    index === 2 ? 'Cloudy' :
+                                      index === 1 ? 'Sunny' : 'Cloudy'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
+        }
       </div>
     </main>
   );

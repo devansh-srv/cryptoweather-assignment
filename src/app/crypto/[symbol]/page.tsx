@@ -38,6 +38,9 @@ export default function CryptoDetail({ params }) {
   const router = useRouter();
   const { symbol } = React.use(params);
   const decodedSymbol = decodeURIComponent(symbol).trim();
+  const dispatch = useDispatch();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // State for crypto data
   const [cryptoData, setCryptoData] = useState({
@@ -74,6 +77,7 @@ export default function CryptoDetail({ params }) {
   const [currentDateTime, setCurrentDateTime] = useState('2025-04-04 17:12:05');
 
   const fetchCurrentCryptodata = async () => {
+    setLoading(true);
     try {
       // console.log(`${BASE_URL_CRYPTO}/data/blockchain/histo/day?fsym=${encodeURIComponent(decodedSymbol)}&api_key=${CRYPTO_API}`)
       const response = await fetch(`${BASE_URL_CRYPTO}/data/pricemultifull?fsyms=${encodeURIComponent(decodedSymbol)}&tsyms=USD`);
@@ -112,9 +116,19 @@ export default function CryptoDetail({ params }) {
         allTimeHighDate: ath?.allTimeHighDate
 
       });
+      setError(null);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error(`Current Crypto Fetch failed due to : ${error}`)
+      setError(error.message)
+      dispatch(addNotification({
+        id: uuidv4(),
+        type: 'price_alert',
+        message: `Error fetching ${decodedSymbol} data: ${error.message}`,
+        timestamp: Date.now(),
+      }));
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -153,7 +167,6 @@ export default function CryptoDetail({ params }) {
       console.error(`Error fetching historical crypto data: ${error}`);
     }
   };
-  const dispatch = useDispatch();
   useEffect(() => {
     const socket = new WebSocket(`wss://streamer.cryptocompare.com/v2?api_key=${CRYPTO_API}`);
     socket.onopen = () => {
@@ -194,10 +207,10 @@ export default function CryptoDetail({ params }) {
 
     const currentCryptoInterval = setInterval(() => {
       fetchCurrentCryptodata();
-    }, 3600000)
+    }, 60000)
     const historicalCryptoDataInterval = setInterval(() => {
       fetchHistoricalCryptoData();
-    }, 3600000)
+    }, 60000)
     // Update current date/time
     const updateDateTime = () => {
       const now = new Date();
@@ -207,7 +220,7 @@ export default function CryptoDetail({ params }) {
     };
 
     updateDateTime();
-    const interval = setInterval(updateDateTime, 3600000);
+    const interval = setInterval(updateDateTime, 60000);
 
     return () => {
       clearInterval(interval);
@@ -296,122 +309,131 @@ export default function CryptoDetail({ params }) {
   return (
     <main className="min-h-screen text-white bg-gradient-to-br from-gray-900 to-gray-800">
       <div className="container py-8 px-4 mx-auto">
-        <Link href="/" className="inline-flex items-center mb-6 text-blue-400 hover:text-blue-300">
-          <ArrowLeft size={16} className="mr-2" />
-          Back to Dashboard
-        </Link>
+        {loading && <p className='text-center'>
+          Loading crypto data...
+        </p>}
+        {error && <p className='text-center text-red-500'>{error}</p>}
+        {<>
 
-        <div className="flex flex-col justify-between items-start mb-8 md:flex-row">
-          <div>
-            <h1 className="mb-2 text-3xl font-bold">
-              {cryptoData.name} ({cryptoData.symbol})
-            </h1>
-            <p className="text-gray-400">Last updated: {currentDateTime}</p>
+
+          <Link href="/" className="inline-flex items-center mb-6 text-blue-400 hover:text-blue-300">
+            <ArrowLeft size={16} className="mr-2" />
+            Back to Dashboard
+          </Link>
+
+          <div className="flex flex-col justify-between items-start mb-8 md:flex-row">
+            <div>
+              <h1 className="mb-2 text-3xl font-bold">
+                {cryptoData.name} ({cryptoData.symbol})
+              </h1>
+              <p className="text-gray-400">Last updated: {currentDateTime}</p>
+            </div>
           </div>
-        </div>
 
-        {/* Current Crypto Stats Card */}
-        <div className="p-6 mb-8 bg-gray-800 rounded-xl border border-gray-700 shadow-lg">
-          <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
-            <div className="flex items-center">
-              {renderCryptoIcon()}
-              <div className="ml-4">
-                <div className="text-4xl font-bold">{cryptoData.price}</div>
-                <div className={`flex items - center ${cryptoData.change.startsWith('+') ? 'text-green-500' : 'text-red-500'
-                  } `}>
-                  {cryptoData.change.startsWith('+')
-                    ? <TrendingUp size={16} className="mr-1" />
-                    : <TrendingDown size={16} className="mr-1" />
-                  }
-                  {cryptoData.change} (24h)
+          {/* Current Crypto Stats Card */}
+          <div className="p-6 mb-8 bg-gray-800 rounded-xl border border-gray-700 shadow-lg">
+            <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+              <div className="flex items-center">
+                {renderCryptoIcon()}
+                <div className="ml-4">
+                  <div className="text-4xl font-bold">{cryptoData.price}</div>
+                  <div className={`flex items - center ${cryptoData.change.startsWith('+') ? 'text-green-500' : 'text-red-500'
+                    } `}>
+                    {cryptoData.change.startsWith('+')
+                      ? <TrendingUp size={16} className="mr-1" />
+                      : <TrendingDown size={16} className="mr-1" />
+                    }
+                    {cryptoData.change} (24h)
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div className="p-3 bg-gray-700 rounded-lg">
+                  <div className="flex items-center mb-1 text-gray-400">
+                    <DollarSign size={16} className="mr-2 text-green-400" />
+                    Market Cap
+                  </div>
+                  <div className="text-xl">{cryptoData.marketCap}</div>
+                </div>
+
+                <div className="p-3 bg-gray-700 rounded-lg">
+                  <div className="flex items-center mb-1 text-gray-400">
+                    <BarChart2 size={16} className="mr-2 text-blue-400" />
+                    24h Volume
+                  </div>
+                  <div className="text-xl">{cryptoData.volume24h}</div>
+                </div>
+
+
+                <div className="p-3 bg-gray-700 rounded-lg">
+                  <div className="flex items-center mb-1 text-gray-400">
+                    <TrendingUp size={16} className="mr-2 text-yellow-400" />
+                    All Time High
+                  </div>
+                  <div className="text-xl">{cryptoData.allTimeHigh}</div>
+                  <div className="text-xs text-gray-400">{cryptoData.allTimeHighDate}</div>
                 </div>
               </div>
             </div>
+          </div>
 
-            <div className="grid grid-cols-3 gap-4">
-              <div className="p-3 bg-gray-700 rounded-lg">
-                <div className="flex items-center mb-1 text-gray-400">
-                  <DollarSign size={16} className="mr-2 text-green-400" />
-                  Market Cap
-                </div>
-                <div className="text-xl">{cryptoData.marketCap}</div>
-              </div>
+          {/* Price History Chart */}
+          <div className="p-6 mb-8 bg-gray-800 rounded-xl border border-gray-700 shadow-lg">
+            <h2 className="mb-6 text-xl font-semibold">Price History</h2>
 
-              <div className="p-3 bg-gray-700 rounded-lg">
-                <div className="flex items-center mb-1 text-gray-400">
-                  <BarChart2 size={16} className="mr-2 text-blue-400" />
-                  24h Volume
-                </div>
-                <div className="text-xl">{cryptoData.volume24h}</div>
-              </div>
-
-
-              <div className="p-3 bg-gray-700 rounded-lg">
-                <div className="flex items-center mb-1 text-gray-400">
-                  <TrendingUp size={16} className="mr-2 text-yellow-400" />
-                  All Time High
-                </div>
-                <div className="text-xl">{cryptoData.allTimeHigh}</div>
-                <div className="text-xs text-gray-400">{cryptoData.allTimeHighDate}</div>
-              </div>
+            <div className="h-80">
+              <Line options={chartOptions} data={priceChartData} />
             </div>
           </div>
-        </div>
 
-        {/* Price History Chart */}
-        <div className="p-6 mb-8 bg-gray-800 rounded-xl border border-gray-700 shadow-lg">
-          <h2 className="mb-6 text-xl font-semibold">Price History</h2>
+          {/* Volume History Chart */}
+          <div className="p-6 mb-8 bg-gray-800 rounded-xl border border-gray-700 shadow-lg">
+            <h2 className="mb-6 text-xl font-semibold">Trading Volume</h2>
 
-          <div className="h-80">
-            <Line options={chartOptions} data={priceChartData} />
+            <div className="h-80">
+              <Line options={volumeChartOptions} data={volumeChartData} />
+            </div>
           </div>
-        </div>
 
-        {/* Volume History Chart */}
-        <div className="p-6 mb-8 bg-gray-800 rounded-xl border border-gray-700 shadow-lg">
-          <h2 className="mb-6 text-xl font-semibold">Trading Volume</h2>
+          {/* Historical Price Table */}
+          <div className="p-6 bg-gray-800 rounded-xl border border-gray-700 shadow-lg">
+            <h2 className="mb-6 text-xl font-semibold">30-Day Historical Data</h2>
 
-          <div className="h-80">
-            <Line options={volumeChartOptions} data={volumeChartData} />
+            <div className="overflow-x-auto">
+              <table className="overflow-hidden min-w-full bg-gray-700 rounded-lg">
+                <thead>
+                  <tr className="bg-gray-600">
+                    <th className="py-3 px-4 text-left">Date</th>
+                    <th className="py-3 px-4 text-left">Price (USD)</th>
+                    <th className="py-3 px-4 text-left">Volume (Billion USD)</th>
+                    <th className="py-3 px-4 text-left">Change</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {historicalData.labels.map((date, index) => {
+                    const currentPrice = historicalData.prices[index];
+                    const prevPrice = index > 0 ? historicalData.prices[index - 1] : currentPrice;
+                    const priceChange = ((currentPrice - prevPrice) / prevPrice * 100).toFixed(2);
+                    const isPositive = parseFloat(priceChange) >= 0;
+
+                    return (
+                      <tr key={index} className="border-t border-gray-600">
+                        <td className="py-3 px-4">{date}</td>
+                        <td className="py-3 px-4">${historicalData.prices[index].toLocaleString()}</td>
+                        <td className="py-3 px-4">${historicalData.volumes[index]}B</td>
+                        <td className={`py - 3 px - 4 ${isPositive ? 'text-green-500' : 'text-red-500'} `}>
+                          {isPositive ? '+' : ''}{priceChange}%
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-
-        {/* Historical Price Table */}
-        <div className="p-6 bg-gray-800 rounded-xl border border-gray-700 shadow-lg">
-          <h2 className="mb-6 text-xl font-semibold">30-Day Historical Data</h2>
-
-          <div className="overflow-x-auto">
-            <table className="overflow-hidden min-w-full bg-gray-700 rounded-lg">
-              <thead>
-                <tr className="bg-gray-600">
-                  <th className="py-3 px-4 text-left">Date</th>
-                  <th className="py-3 px-4 text-left">Price (USD)</th>
-                  <th className="py-3 px-4 text-left">Volume (Billion USD)</th>
-                  <th className="py-3 px-4 text-left">Change</th>
-                </tr>
-              </thead>
-              <tbody>
-                {historicalData.labels.map((date, index) => {
-                  const currentPrice = historicalData.prices[index];
-                  const prevPrice = index > 0 ? historicalData.prices[index - 1] : currentPrice;
-                  const priceChange = ((currentPrice - prevPrice) / prevPrice * 100).toFixed(2);
-                  const isPositive = parseFloat(priceChange) >= 0;
-
-                  return (
-                    <tr key={index} className="border-t border-gray-600">
-                      <td className="py-3 px-4">{date}</td>
-                      <td className="py-3 px-4">${historicalData.prices[index].toLocaleString()}</td>
-                      <td className="py-3 px-4">${historicalData.volumes[index]}B</td>
-                      <td className={`py - 3 px - 4 ${isPositive ? 'text-green-500' : 'text-red-500'} `}>
-                        {isPositive ? '+' : ''}{priceChange}%
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        </>
+        }
       </div>
     </main>
   );

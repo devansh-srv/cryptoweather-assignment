@@ -15,6 +15,13 @@ import {
   Star,
   StarOff
 } from 'lucide-react';
+import { useDispatch, useSelector } from 'react-redux';
+import { toggleCityFavorite, toggleCryptoFavorite } from './store/preferenceSlice';
+import FavoriteSetter from './components/FavoriteSetter'
+import { RootState } from './store/store';
+// lazy import the NotificationToast
+import dynamic from 'next/dynamic'
+const NotificationToast = dynamic(() => import('./components/NotificationToast'));
 
 const BASE_URL_WEATHER = 'http://api.weatherapi.com/v1'
 const WEATHER_API = process.env.NEXT_PUBLIC_WEATHER_API
@@ -22,7 +29,13 @@ const BASE_URL_CRYPTO = 'https://min-api.cryptocompare.com'
 // const CRYPTO_API = process.env.NEXT_PUBLIC_CRYPTO_API;
 const NEWS_API = process.env.NEXT_PUBLIC_NEWS_API
 const BASE_URL_NEWS = 'https://newsdata.io/api/1'
+
 export default function Dashboard() {
+  const dispatch = useDispatch();
+
+  const favoriteCities = useSelector((state: RootState) => state.preferences.favoriteCities);
+  const favoriteCryptos = useSelector((state: RootState) => state.preferences.favoriteCryptos);
+
   const [currentDateTime, setCurrentDateTime] = useState('2025-04-04 17:12:05');
   // State for weather data
   const [weatherData, setWeatherData] = useState({
@@ -57,7 +70,7 @@ export default function Dashboard() {
 
   const fetchWeatherData = async () => {
     try {
-      const cities = ['New York', 'London', 'Tokyo'];
+      const cities = ['New York', 'London', 'Tokyo', 'Mumbai', 'Shanghai', 'Moscow'];
       const weatherPromises = cities.map(async (city) => {
         const response = await fetch(`${BASE_URL_WEATHER}/current.json?key=${WEATHER_API}&q=${encodeURIComponent(city)}&aqi=no`);
         if (!response.ok) {
@@ -81,7 +94,7 @@ export default function Dashboard() {
 
   const fetchCryptoData = async () => {
     try {
-      const coins = ['BTC', 'ETH', 'SOL'];
+      const coins = ['BTC', 'ETH', 'SOL', 'DOGE', 'LINK', 'XRP'];
       const cryptoPromises = coins.map(async (coin) => {
         const response = await fetch(`${BASE_URL_CRYPTO}/data/pricemultifull?fsyms=${encodeURIComponent(coin)}&tsyms=USD`);
         if (!response.ok) {
@@ -91,7 +104,7 @@ export default function Dashboard() {
         const coinData = data.RAW[coin].USD;
         // console.log(`coinData: ${coinData}`)
         return {
-          name: coin === 'BTC' ? 'Bitcoin' : coin === 'ETH' ? 'Ethereum' : 'Solana',
+          name: coin === 'BTC' ? 'Bitcoin' : coin === 'ETH' ? 'Ethereum' : coin === 'SOL' ? 'Solana' : coin === 'DOGE' ? 'Doge' : coin === 'LINK' ? 'Chainlink' : 'XRP',
           symbol: coin,
           price: `$${coinData.PRICE.toLocaleString(undefined, {
             minimumFractionDigits: 2,
@@ -130,25 +143,14 @@ export default function Dashboard() {
       console.error('Error fetching news data:', error);
     }
   };
-  // Function to toggle favorite status for cities
-  const toggleCityFavorite = (cityName) => {
-    setWeatherData({
-      ...weatherData,
-      cities: weatherData.cities.map(city =>
-        city.name === cityName ? { ...city, isFavorite: !city.isFavorite } : city
-      )
-    });
-  };
 
-  // Function to toggle favorite status for cryptocurrencies
-  const toggleCryptoFavorite = (symbol) => {
-    setCryptoData({
-      ...cryptoData,
-      coins: cryptoData.coins.map(coin =>
-        coin.symbol === symbol ? { ...coin, isFavorite: !coin.isFavorite } : coin
-      )
-    });
-  };
+  const toggleCityFavoriteHandler = (cityName: string) => {
+    dispatch(toggleCityFavorite(cityName));
+  }
+
+  const toggleCryptoFavoriteHandler = (symbol: string) => {
+    dispatch(toggleCryptoFavorite(symbol));
+  }
   // Effect to simulate real-time data updates
   useEffect(() => {
     fetchWeatherData();
@@ -193,14 +195,14 @@ export default function Dashboard() {
       ? <TrendingUp className="text-green-500" />
       : <TrendingDown className="text-red-500" />;
   };
-
   return (
     <main className="min-h-screen text-white bg-gradient-to-br from-gray-900 to-gray-800">
       <div className="container py-8 px-4 mx-auto">
         <h1 className="mb-12 text-4xl font-bold text-center text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-600">
           CryptoWeather Nexus
         </h1>
-
+        <NotificationToast />
+        <FavoriteSetter />
         {/* Dashboard Grid Layout */}
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
 
@@ -213,43 +215,43 @@ export default function Dashboard() {
               </h2>
               <span className="text-xs text-gray-400">Last updated: {currentDateTime}</span>
             </div>
-
-            <div className="space-y-6">
-              {weatherData.cities.map((city) => (
-                <div key={city.name} className="flex justify-between items-center p-4 bg-gray-700 rounded-lg">
-                  <div>
+            <div className="space-y-4">
+              {weatherData.cities.map((city, idx) => (
+                <Link href={`/weather/${encodeURIComponent(city.name)}`} key={city.name}>
+                  <div className={`flex justify-between items-center p-4 bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-600 ${idx !== weatherData.cities.length - 1 ? 'mb-4' : ''}`}>
+                    <div>
+                      <div className="flex gap-2 items-center">
+                        <h3 className="text-lg font-medium">{city.name}</h3>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleCityFavoriteHandler(city.name);
+                          }}
+                          className="text-yellow-400 hover:text-yellow-300"
+                        >
+                          {favoriteCities.includes(city.name) ? <Star size={16} /> : <StarOff size={16} />}
+                        </button>
+                      </div>
+                      <div className="flex gap-4 items-center mt-2">
+                        <div className="flex gap-1 items-center text-sm text-gray-300">
+                          <Droplets size={14} className="text-blue-400" />
+                          {city.humidity}
+                        </div>
+                        <div className="flex gap-1 items-center text-sm text-gray-300">
+                          <Wind size={14} className="text-blue-300" />
+                          {city.condition}
+                        </div>
+                      </div>
+                    </div>
                     <div className="flex gap-2 items-center">
-                      <h3 className="text-lg font-medium">{city.name}</h3>
-                      <button
-                        onClick={() => toggleCityFavorite(city.name)}
-                        className="text-yellow-400 hover:text-yellow-300"
-                      >
-                        {city.isFavorite ? <Star size={16} /> : <StarOff size={16} />}
-                      </button>
-                    </div>
-                    <div className="flex gap-4 items-center mt-2">
-                      <div className="flex gap-1 items-center text-sm text-gray-300">
-                        <Droplets size={14} className="text-blue-400" />
-                        {city.humidity}
-                      </div>
-                      <div className="flex gap-1 items-center text-sm text-gray-300">
-                        <Wind size={14} className="text-blue-300" />
-                        {city.condition}
-                      </div>
+                      {renderWeatherIcon(city.condition)}
+                      <span className="text-2xl">{city.temp}</span>
                     </div>
                   </div>
-                  <div className="flex gap-2 items-center">
-                    {renderWeatherIcon(city.condition)}
-                    <span className="text-2xl">{city.temp}</span>
-                  </div>
-                </div>
+                </Link>
               ))}
             </div>
 
-            <Link href={`/weather/${encodeURIComponent(weatherData.cities[0].name)
-              }`} className="block py-2 px-4 mt-6 w-full text-center bg-blue-600 rounded-lg transition-colors duration-300 hover:bg-blue-700">
-              View Detailed Weather
-            </Link>
           </div>
 
           {/* Cryptocurrency Section */}
@@ -262,43 +264,42 @@ export default function Dashboard() {
               <span className="text-xs text-gray-400">Live updates</span>
             </div>
 
-            <div className="space-y-6">
-              {cryptoData.coins.map((coin) => (
-                <div key={coin.symbol} className="p-4 bg-gray-700 rounded-lg">
-                  <div className="flex justify-between items-center">
-                    <div className="flex gap-2 items-center">
-                      <h3 className="text-lg font-medium">{coin.name}</h3>
-                      <span className="text-sm text-gray-400">{coin.symbol}</span>
-                      <button
-                        onClick={() => toggleCryptoFavorite(coin.symbol)}
-                        className="text-yellow-400 hover:text-yellow-300"
-                      >
-                        {coin.isFavorite ? <Star size={16} /> : <StarOff size={16} />}
-                      </button>
+            <div className="space-y-4">
+              {cryptoData.coins.map((coin, idx) => (
+                <Link href={`/crypto/${encodeURIComponent(coin.symbol)}`} key={coin.symbol}>
+                  <div className={`flex justify-between items-center p-4 bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-600 ${idx !== weatherData.cities.length - 1 ? 'mb-6' : ''}`}>
+                    <div>
+                      <div className="flex gap-2 items-center">
+                        <h3 className="text-lg font-medium">{coin.name}</h3>
+                        <span className="text-sm text-gray-400">{coin.symbol}</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleCryptoFavoriteHandler(coin.symbol);
+                          }}
+                          className="text-yellow-400 hover:text-yellow-300"
+                        >
+                          {favoriteCryptos.includes(coin.symbol) ? <Star size={16} /> : <StarOff size={16} />}
+                        </button>
+                      </div>
+                      <div className="mt-2 text-sm text-gray-300">
+                        Market Cap: {coin.marketCap}
+                      </div>
                     </div>
-                    <div className="text-xl font-medium">{coin.price}</div>
+                    <div className="flex flex-col items-end">
+                      <div className="text-xl font-medium">{coin.price}</div>
+                      <div className={`flex items-center gap-1 mt-1 ${coin.change.startsWith('+') ? 'text-green-500' : 'text-red-500'
+                        }`}>
+                        {renderChangeIcon(coin.change)}
+                        {coin.change}
+                      </div>
+                    </div>
                   </div>
-
-                  <div className="flex justify-between items-center mt-3">
-                    <div className="text-sm text-gray-300">
-                      Market Cap: {coin.marketCap}
-                    </div>
-                    <div className={`flex items - center gap - 1 ${coin.change.startsWith('+') ? 'text-green-500' : 'text-red-500'
-                      }`}>
-                      {renderChangeIcon(coin.change)}
-                      {coin.change}
-                    </div>
-                  </div>
-                </div>
+                </Link>
               ))}
             </div>
 
-            <Link href={`/crypto/${encodeURIComponent(cryptoData.coins[0].symbol)
-              }`} className="block py-2 px-4 mt-6 w-full text-center bg-yellow-600 rounded-lg transition-colors duration-300 hover:bg-yellow-700">
-              View Crypto Details
-            </Link>
           </div>
-
           {/* News Section */}
           <div className="p-6 bg-gray-800 rounded-xl border border-gray-700 shadow-lg">
             <div className="flex justify-between items-center mb-6">
@@ -311,8 +312,7 @@ export default function Dashboard() {
 
             <div className="space-y-4">
               {newsData.headlines.map((headline, index) => (
-
-                <div key={index} className="p-4 bg-gray-700 rounded-lg">
+                <div key={index} className="p-4 bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-600">
                   <a href={headline.url} target='_blank' >
                     <h3 className="mb-2 font-medium text-md">{headline.title}</h3>
                     <div className="flex justify-between items-center text-sm">
@@ -323,13 +323,9 @@ export default function Dashboard() {
                 </div>
               ))}
             </div>
-
-            {/* <button className="py-2 px-4 mt-6 w-full bg-purple-600 rounded-lg transition-colors duration-300 hover:bg-purple-700"> */}
-            {/*   View All News */}
-            {/* </button> */}
           </div>
         </div>
       </div>
-    </main>
+    </main >
   );
 }
