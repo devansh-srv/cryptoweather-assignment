@@ -20,7 +20,13 @@ import {
   Tooltip,
   Legend,
 } from 'chart.js';
-
+import {
+  SiEthereum,
+  SiSolana,
+  SiChainlink,
+  SiXrp, SiDogecoin,
+  SiBitcoin,
+} from 'react-icons/si';
 // Register ChartJS components
 ChartJS.register(
   CategoryScale,
@@ -47,13 +53,12 @@ export default function CryptoDetailClient({ params, initialData }: CryptoDetail
 
   // State for crypto data
   const [cryptoData, setCryptoData] = useState({
-    name: decodedSymbol === 'BTC' ? 'Bitcoin' : decodedSymbol === 'ETH' ? 'Ethereum' : 'Solana',
+    name: decodedSymbol === 'BTC' ? 'Bitcoin' : decodedSymbol === 'ETH' ? 'Ethereum' : decodedSymbol === 'SOL' ? 'Solana' : decodedSymbol === 'DOGE' ? 'Doge' : decodedSymbol === 'LINK' ? 'Chainlink' : 'XRP',
     symbol: decodedSymbol,
     price: decodedSymbol === 'BTC' ? '$68,245.32' : decodedSymbol === 'ETH' ? '$3,456.78' : '$142.19',
     change: decodedSymbol === 'BTC' ? '+2.5%' : decodedSymbol === 'ETH' ? '-1.2%' : '+5.7%',
     marketCap: decodedSymbol === 'BTC' ? '$1.32T' : decodedSymbol === 'ETH' ? '$416.8B' : '$61.3B',
     volume24h: decodedSymbol === 'BTC' ? '$42.3B' : decodedSymbol === 'ETH' ? '$18.5B' : '$3.8B',
-    // circulatingSupply: decodedSymbol === 'BTC' ? '19.35M BTC' : decodedSymbol === 'ETH' ? '120.21M ETH' : '431.15M SOL',
     allTimeHigh: decodedSymbol === 'BTC' ? '$69,045.00' : decodedSymbol === 'ETH' ? '$4,891.70' : '$260.06',
     allTimeHighDate: decodedSymbol === 'BTC' ? '2025-03-15' : decodedSymbol === 'ETH' ? '2024-12-01' : '2024-11-08',
   });
@@ -82,22 +87,13 @@ export default function CryptoDetailClient({ params, initialData }: CryptoDetail
   const fetchCurrentCryptodata = async () => {
     setLoading(true);
     try {
-      // console.log(`${BASE_URL_CRYPTO}/data/blockchain/histo/day?fsym=${encodeURIComponent(decodedSymbol)}&api_key=${CRYPTO_API}`)
       const response = await fetch(`${BASE_URL_CRYPTO}/data/pricemultifull?fsyms=${encodeURIComponent(decodedSymbol)}&tsyms=USD`);
-      // const supplyResponse = await fetch(`${BASE_URL_CRYPTO}/data/blockchain/histo/day?fsym=${encodeURIComponent(decodedSymbol)}&limit=1&api_key=${CRYPTO_API}`)
       const ath = await fetchHistoricalCryptoData();
       if (!response.ok) {
         throw new Error(`Crypto API Fail error: ${response.status}`);
       }
-      // if (!supplyResponse.ok) {
-      //   throw new Error(`Crypto supply API failed: ${response.status}`);
-      // }
       const data = await response.json();
       const coinData = data.RAW[decodedSymbol].USD;
-      // const supplyData = await supplyResponse.json();
-      // console.log('supply: ', supplyData)
-      // const currentSupply = supplyData.Data.Data[0].current_supply;
-      // console.log(currentSupply)
       setCryptoData({
         name: decodedSymbol === 'BTC' ? 'Bitcoin' : decodedSymbol === 'ETH' ? 'Ethereum' : 'Solana',
         symbol: decodedSymbol,
@@ -111,10 +107,6 @@ export default function CryptoDetailClient({ params, initialData }: CryptoDetail
           minimumFractionDigits: 2,
           maximumFractionDigits: 2
         })}`,
-        // circulatingSupply: '',
-        // `${currentSupply.toLocaleString(undefined, {
-        //   maximumFractionDigits: 0
-        // })} ${decodedSymbol}`,
         allTimeHigh: ath.allTimeHigh,
         allTimeHighDate: ath?.allTimeHighDate
 
@@ -234,12 +226,21 @@ export default function CryptoDetailClient({ params, initialData }: CryptoDetail
   }, [decodedSymbol, dispatch]);
 
   // Helper function to render crypto icon based on symbol
+  const iconMap: Record<string, { icon: React.ElementType; color: string }> = {
+    BTC: { icon: SiBitcoin, color: "text-yellow-500" },
+    ETH: { icon: SiEthereum, color: "text-purple-500" },
+    SOL: { icon: SiSolana, color: "text-purple-500" },
+    CHAIN: { icon: SiChainlink, color: "text-blue-500" },
+    DOGE: { icon: SiDogecoin, color: "text-yellow-500" },
+    XRP: { icon: SiXrp, color: "text-black" },
+  };
   const renderCryptoIcon = () => {
-    return <Bitcoin className={
-      decodedSymbol === 'BTC' ? "text-yellow-500" :
-        decodedSymbol === 'ETH' ? "text-purple-500" :
-          "text-blue-500"
-    } size={48} />;
+    const { icon: IconComponent, color } = iconMap[decodedSymbol] || {
+      icon: Bitcoin,
+      color: 'text-gray-400',
+    };
+    return < IconComponent className={color} size={48} />;
+
   };
 
   // Chart data for price history
